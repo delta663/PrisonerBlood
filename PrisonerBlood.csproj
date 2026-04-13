@@ -1,0 +1,65 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <AssemblyName>PrisonerBlood</AssemblyName>
+    <Description>Server-side V Rising mod that lets players buy prisoners with 100% blood quality and Blood Merlot potions.</Description>
+    <Version>1.0.0</Version>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BepInEx.PluginInfoProps" Version="2.*" />
+    <PackageReference Include="VRising.VampireCommandFramework" Version="0.10.*" />
+    <PackageReference Include="System.Text.Json" Version="6.0.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Backtrace.Unity" HintPath="..\interop\Backtrace.Unity.dll" />
+    <Reference Include="com.rlabrecque.steamworks.net" HintPath="..\interop\com.rlabrecque.steamworks.net.dll" />
+    <Reference Include="com.stunlock.network.eos" HintPath="..\interop\com.stunlock.network.eos.dll" />
+    <Reference Include="com.stunlock.platform" HintPath="..\interop\com.stunlock.platform.dll" />
+    <Reference Include="com.stunlock.platform.pc" HintPath="..\interop\com.stunlock.platform.pc.dll" />
+    <Reference Include="Il2CppMono.Security" HintPath="..\interop\Il2CppMono.Security.dll" />
+    <Reference Include="Il2Cppmscorlib" HintPath="..\interop\Il2Cppmscorlib.dll" />
+    <Reference Include="Il2CppSystem.Configuration" HintPath="..\interop\Il2CppSystem.Configuration.dll" />
+    <Reference Include="Il2CppSystem.Core" HintPath="..\interop\Il2CppSystem.Core.dll" />
+    <Reference Include="Il2CppSystem.Data" HintPath="..\interop\Il2CppSystem.Data.dll" />
+    <Reference Include="Il2CppSystem" HintPath="..\interop\Il2CppSystem.dll" />
+    <Reference Include="Il2CppSystem.Drawing" HintPath="..\interop\Il2CppSystem.Drawing.dll" />
+    <Reference Include="Il2CppSystem.Net.Http" HintPath="..\interop\Il2CppSystem.Net.Http.dll" />
+    <Reference Include="Il2CppSystem.Numerics" HintPath="..\interop\Il2CppSystem.Numerics.dll" />
+    <Reference Include="Il2CppSystem.Runtime.CompilerServices.Unsafe" HintPath="..\interop\Il2CppSystem.Runtime.CompilerServices.Unsafe.dll" />
+    <Reference Include="Il2CppSystem.Runtime.Serialization" HintPath="..\interop\Il2CppSystem.Runtime.Serialization.dll" />
+    <Reference Include="Il2CppSystem.Xml" HintPath="..\interop\Il2CppSystem.Xml.dll" />
+    <Reference Include="Il2CppSystem.Xml.Linq" HintPath="..\interop\Il2CppSystem.Xml.Linq.dll" />
+    <Reference Include="ProjectM" HintPath="..\interop\ProjectM.dll" />
+    <Reference Include="ProjectM.Behaviours" HintPath="..\interop\ProjectM.Behaviours.dll" />
+    <Reference Include="ProjectM.CodeGeneration" HintPath="..\interop\ProjectM.CodeGeneration.dll" />
+    <Reference Include="ProjectM.Gameplay.Scripting" HintPath="..\interop\ProjectM.Gameplay.Scripting.dll" />
+    <Reference Include="ProjectM.Gameplay.Systems" HintPath="..\interop\ProjectM.Gameplay.Systems.dll" />
+    <Reference Include="ProjectM.GeneratedNetCode" HintPath="..\interop\ProjectM.GeneratedNetCode.dll" />
+    <Reference Include="ProjectM.Shared" HintPath="..\interop\ProjectM.Shared.dll" />
+    <Reference Include="Stunlock.Core" HintPath="..\interop\Stunlock.Core.dll" />
+    <Reference Include="Unity.Collections" HintPath="..\interop\Unity.Collections.dll" />
+    <Reference Include="Unity.Entities" HintPath="..\interop\Unity.Entities.dll" />
+    <Reference Include="Unity.Mathematics" HintPath="..\interop\Unity.Mathematics.dll" />
+    <Reference Include="Unity.Transforms" HintPath="..\interop\Unity.Transforms.dll" />
+    <Reference Include="UnityEngine" HintPath="..\interop\UnityEngine.dll" />
+    <Reference Include="UnityEngine.CoreModule" HintPath="..\interop\UnityEngine.CoreModule.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="0Harmony" HintPath="..\core\0Harmony.dll" />
+    <Reference Include="BepInEx.Core" HintPath="..\core\BepInEx.Core.dll" />
+    <Reference Include="BepInEx.Unity.Common" HintPath="..\core\BepInEx.Unity.Common.dll" />
+    <Reference Include="BepInEx.Unity.IL2CPP" HintPath="..\core\BepInEx.Unity.IL2CPP.dll" />
+    <Reference Include="Il2CppInterop.Common" HintPath="..\core\Il2CppInterop.Common.dll" />
+    <Reference Include="Il2CppInterop.HarmonySupport" HintPath="..\core\Il2CppInterop.HarmonySupport.dll" />
+    <Reference Include="Il2CppInterop.Runtime" HintPath="..\core\Il2CppInterop.Runtime.dll" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <NoWarn>NU1605</NoWarn>
+  </PropertyGroup>
+</Project>

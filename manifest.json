@@ -1,0 +1,10 @@
+{
+  "name": "PrisonerBlood",
+  "version_number": "1.0.0",
+  "website_url": "https://github.com/delta663/PrisonerBlood",
+  "description": "Server-side V Rising mod that lets players buy prisoners with 100% blood quality and Blood Merlot potions.",
+  "dependencies": [
+    "BepInEx-BepInExPack_V_Rising-1.733.2",
+    "deca-VampireCommandFramework-0.10.4"
+  ]
+}
