@@ -10,7 +10,7 @@ internal static class ConfigService
 {
     private static readonly string CONFIG_DIR = Path.Combine(BepInEx.Paths.ConfigPath, MyPluginInfo.PLUGIN_NAME);
     private static readonly string CONFIG_FILE = Path.Combine(CONFIG_DIR, "buyconfig.json");
-    private static readonly object IO_LoCK = new();
+    private static readonly object IO_LOCK = new();
 
     private static DateTime _lastWrite = DateTime.MinValue;
     private static ConfigRoot _root = new();
@@ -31,20 +31,20 @@ internal static class ConfigService
     public static ConfigSection GetPrisonerConfig()
     {
         Load(force: false);
-        lock (IO_LoCK)
+        lock (IO_LOCK)
             return CloneAndNormalize(_root.Prisoner, CreateDefaultRoot().Prisoner);
     }
 
     public static ConfigSection GetBloodPotionConfig()
     {
         Load(force: false);
-        lock (IO_LoCK)
+        lock (IO_LOCK)
             return CloneAndNormalize(_root.BloodPotion, CreateDefaultRoot().BloodPotion);
     }
 
     private static void Load(bool force)
     {
-        lock (IO_LoCK)
+        lock (IO_LOCK)
         {
             try
             {
