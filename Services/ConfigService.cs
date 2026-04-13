@@ -8,9 +8,9 @@ namespace PrisonerBlood.Services;
 
 internal static class ConfigService
 {
-    private static readonly object IoLock = new();
-    private static readonly string ConfigDir = Path.Combine(BepInEx.Paths.ConfigPath, MyPluginInfo.PLUGIN_NAME);
-    private static readonly string ConfigFile = Path.Combine(ConfigDir, "buyconfig.json");
+    private static readonly string CONFIG_DIR = Path.Combine(BepInEx.Paths.ConfigPath, MyPluginInfo.PLUGIN_NAME);
+    private static readonly string CONFIG_FILE = Path.Combine(CONFIG_DIR, "buyconfig.json");
+    private static readonly object IO_LoCK = new();
 
     private static DateTime _lastWrite = DateTime.MinValue;
     private static ConfigRoot _root = new();
@@ -31,38 +31,38 @@ internal static class ConfigService
     public static ConfigSection GetPrisonerConfig()
     {
         Load(force: false);
-        lock (IoLock)
+        lock (IO_LoCK)
             return CloneAndNormalize(_root.Prisoner, CreateDefaultRoot().Prisoner);
     }
 
     public static ConfigSection GetBloodPotionConfig()
     {
         Load(force: false);
-        lock (IoLock)
+        lock (IO_LoCK)
             return CloneAndNormalize(_root.BloodPotion, CreateDefaultRoot().BloodPotion);
     }
 
     private static void Load(bool force)
     {
-        lock (IoLock)
+        lock (IO_LoCK)
         {
             try
             {
-                Directory.CreateDirectory(ConfigDir);
+                Directory.CreateDirectory(CONFIG_DIR);
 
-                if (!File.Exists(ConfigFile))
+                if (!File.Exists(CONFIG_FILE))
                 {
                     _root = CreateDefaultRoot();
-                    File.WriteAllText(ConfigFile, JsonSerializer.Serialize(_root, JsonOptions));
-                    _lastWrite = File.GetLastWriteTime(ConfigFile);
+                    File.WriteAllText(CONFIG_FILE, JsonSerializer.Serialize(_root, JsonOptions));
+                    _lastWrite = File.GetLastWriteTime(CONFIG_FILE);
                     return;
                 }
 
-                var writeTime = File.GetLastWriteTime(ConfigFile);
+                var writeTime = File.GetLastWriteTime(CONFIG_FILE);
                 if (!force && writeTime <= _lastWrite)
                     return;
 
-                var json = File.ReadAllText(ConfigFile);
+                var json = File.ReadAllText(CONFIG_FILE);
                 _root = JsonSerializer.Deserialize<ConfigRoot>(json, JsonOptions) ?? CreateDefaultRoot();
                 NormalizeRoot(_root);
                 _lastWrite = writeTime;
