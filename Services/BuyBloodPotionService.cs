@@ -69,26 +69,40 @@ internal static class BuyBloodPotionService
         if (!string.IsNullOrWhiteSpace(warningLine))
             reply(warningLine);
 
-        reply("<color=yellow>Command:</color> <color=green>.buy bp <BloodType></color> e.g., <color=green>.buy bp rogue</color>");
+        reply("<color=yellow>Command:</color> <color=green>.buy bp <BloodType></color>");
+        reply("<color=yellow>Example:</color> <color=green>.buy bp rogue</color>");
 
         var sb = new StringBuilder();
         sb.AppendLine($"<color=yellow>Blood types</color> : <color=yellow>Costs</color> (<color=#87CEFA>{CurrencyName}</color>)");
 
-        var parts = prices
-            .OrderBy(kv => kv.Value)
-            .ThenBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
-            .Select(kv => $"{kv.Key} : {kv.Value}")
+        var all = Helper.AllowedBloodTypes
+            .Select(bt =>
+            {
+                var name = bt.ToString();
+
+                bool hasOverride = prices.TryGetValue(name, out var jsonCost);
+                int cost = hasOverride ? jsonCost : defaultCost;
+
+                return new
+                {
+                    Name = name,
+                    Cost = cost,
+                    IsDefault = !hasOverride
+                };
+            })
+            .OrderBy(x => x.Cost)
+            .ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        if (parts.Count == 0)
+        var parts = all
+            .Select(x => $"{x.Name} : {x.Cost}")
+            .ToList();
+
+        const int chunkSize = 3;
+
+        foreach (var chunk in parts.Chunk(chunkSize))
         {
-            sb.AppendLine($"<color=#87CEFA>All blood types default cost</color> : {defaultCost}");
-        }
-        else
-        {
-            const int chunkSize = 3;
-            for (int start = 0; start < parts.Count; start += chunkSize)
-                sb.AppendLine(string.Join(" <color=white>|</color> ", parts.Skip(start).Take(chunkSize)));
+            sb.AppendLine(string.Join(" <color=white>|</color> ", chunk));
         }
 
         reply(sb.ToString().TrimEnd());
@@ -99,7 +113,7 @@ internal static class BuyBloodPotionService
     {
         if (!IsEnabled())
         {
-            reply("<color=red>BuyBloodPotion: Disabled.</color>");
+            reply("<color=yellow>Buy Blood Potion:</color> <color=red>Disabled.</color>");
             return;
         }
 
