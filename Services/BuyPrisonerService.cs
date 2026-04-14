@@ -20,7 +20,7 @@ internal static class BuyPrisonerService
     private static readonly string LOG_FILE = Path.Combine(CONFIG_DIR, "buyprisoner_log.csv");
     private static readonly object LOG_LOCK = new();
 
-    private static readonly PrefabGUID PrisonerPrefab = new(-744966291);
+    private static readonly PrefabGUID PrisonerPrefab = new(593505050);
     private static readonly PrefabGUID ImprisonedBuffPrefab = new(1603329680);
 
     private const float PrisonCellSearchRadius = 3f;
@@ -75,28 +75,42 @@ internal static class BuyPrisonerService
         if (!string.IsNullOrWhiteSpace(warningLine))
             reply(warningLine);
 
-        reply("<color=yellow>Command:</color> <color=green>.buy prisoner <BloodType></color> e.g., <color=green>.buy prisoner rogue</color>");
+        reply("<color=yellow>Command:</color> <color=green>.buy prisoner <BloodType></color>");
+        reply("<color=yellow>Example:</color> <color=green>.buy prisoner rogue</color>");
 
         var sb = new StringBuilder();
         sb.AppendLine($"<color=yellow>Blood types</color> : <color=yellow>Costs</color> (<color=#87CEFA>{CurrencyName}</color>)");
 
-        var parts = prices
-            .OrderBy(kv => kv.Value)
-            .ThenBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
-            .Select(kv => $"{kv.Key} : {kv.Value}")
+        var all = Helper.AllowedBloodTypes
+            .Select(bt =>
+            {
+                var name = bt.ToString();
+
+                bool hasOverride = prices.TryGetValue(name, out var jsonCost);
+                int cost = hasOverride ? jsonCost : defaultCost;
+
+                return new
+                {
+                    Name = name,
+                    Cost = cost,
+                    IsDefault = !hasOverride
+                };
+            })
+            .OrderBy(x => x.Cost)
+            .ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        if (parts.Count == 0)
-        {
-            sb.AppendLine($"<color=#87CEFA>All blood types default cost</color> : {defaultCost}");
-        }
-        else
-        {
-            const int chunkSize = 3;
-            for (int start = 0; start < parts.Count; start += chunkSize)
-                sb.AppendLine(string.Join(" <color=white>|</color> ", parts.Skip(start).Take(chunkSize)));
-        }
+        var parts = all
+            .Select(x => $"{x.Name} : {x.Cost}")
+            .ToList();
 
+        const int chunkSize = 3;
+
+        foreach (var chunk in parts.Chunk(chunkSize))
+        {
+            sb.AppendLine(string.Join(" <color=white>|</color> ", chunk));
+        }
+        
         reply(sb.ToString().TrimEnd());
         reply($"<color=yellow>A prisoner with <color=green>100%</color> blood quality will be placed in the nearest empty prison cell you own within {PrisonCellSearchRadius:0.0}m.</color>");
     }
@@ -105,7 +119,7 @@ internal static class BuyPrisonerService
     {
         if (!IsEnabled())
         {
-            reply("<color=red>BuyPrisoner: Disabled.</color>");
+            reply("<color=yellow>Buy Prisoner:</color> <color=red>Disabled.</color>");
             return;
         }
 
