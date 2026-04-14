@@ -58,6 +58,12 @@ After the first server start, the following files will be created:
 - `BepInEx/config/PrisonerBlood/buybloodpotion_log.csv`
 
 ### buyconfig.json
+- Each section (`Prisoner`, `BloodPotion`) can be enabled or disabled via `Enabled` (true/false)
+- `CurrencyPrefab` defines the item used as currency.
+- `CurrencyName` is the display name shown to players.
+- `DefaultCost` sets the base price for all blood types.
+- `BloodCosts` allows overriding prices for specific blood types.
+- If a blood type is not listed in `BloodCosts`, it will still be available for purchase and will use `DefaultCost`. Removing a blood type from this list does NOT disable it.
 
 ```json
 {
@@ -68,14 +74,14 @@ After the first server start, the following files will be created:
     "DefaultCost": 5000,
     "BloodCosts": {
       "Worker": 4000,
-      "Creature": 4500,
-      "Mutant": 4800,
-      "Draculin": 4800,
+      "Creature": 4200,
+      "Mutant": 4500,
       "Corrupted": 4800,
-      "Warrior": 4800,
-      "Rogue": 5000,
-      "Brute": 5200,
-      "Scholar": 5500
+      "Draculin": 5000,
+      "Warrior": 5200,
+      "Rogue": 5500,
+      "Brute": 5700,
+      "Scholar": 6000
     }
   },
   "BloodPotion": {
@@ -85,14 +91,14 @@ After the first server start, the following files will be created:
     "DefaultCost": 500,
     "BloodCosts": {
       "Worker": 300,
-      "Creature": 400,
-      "Mutant": 450,
+      "Creature": 350,
+      "Mutant": 400,
+      "Corrupted": 450,
       "Draculin": 500,
-      "Corrupted": 650,
-      "Rogue": 650,
-      "Warrior": 700,
-      "Brute": 750,
-      "Scholar": 800
+      "Warrior": 550,
+      "Rogue": 600,
+      "Brute": 650,
+      "Scholar": 700
     }
   }
 }
