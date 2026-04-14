@@ -117,14 +117,14 @@ internal static class ConfigService
                 BloodCosts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
                 {
                     { "Worker", 4000 },
-                    { "Creature", 4500 },
-                    { "Mutant", 4800 },
-                    { "Draculin", 4800 },
+                    { "Creature", 4200 },
+                    { "Mutant", 4500 },
                     { "Corrupted", 4800 },
-                    { "Warrior", 4800 },
-                    { "Rogue", 5000 },
-                    { "Brute", 5200 },
-                    { "Scholar", 5500 }
+                    { "Draculin", 5000 },
+                    { "Warrior", 5200 },
+                    { "Rogue", 5500 },
+                    { "Brute", 5700 },
+                    { "Scholar", 6000 }
                 }
             },
             BloodPotion = new ConfigSection
@@ -136,14 +136,14 @@ internal static class ConfigService
                 BloodCosts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
                 {
                     { "Worker", 300 },
-                    { "Creature", 400 },
-                    { "Mutant", 450 },
+                    { "Creature", 350 },
+                    { "Mutant", 400 },
+                    { "Corrupted", 450 },
                     { "Draculin", 500 },
-                    { "Corrupted", 650 },
-                    { "Rogue", 650 },
-                    { "Warrior", 700 },
-                    { "Brute", 750 },
-                    { "Scholar", 800 }
+                    { "Warrior", 550 },
+                    { "Rogue", 600 },
+                    { "Brute", 650 },
+                    { "Scholar", 700 }
                 }
             }
         };
