@@ -25,7 +25,11 @@ internal static class BuyPrisonerService
 
     private const float PrisonCellSearchRadius = 3f;
 
-    public static void Initialize() => ConfigService.Initialize();
+    public static void Initialize() 
+    {
+        ConfigService.Initialize();
+        InitializeLogFile();
+    }
     public static void Reload() => ConfigService.Reload();
 
     public static string CurrencyName
@@ -76,10 +80,10 @@ internal static class BuyPrisonerService
             reply(warningLine);
 
         reply("<color=yellow>Command:</color> <color=green>.buy prisoner <BloodType></color>");
-        reply("<color=yellow>Example:</color> <color=green>.buy prisoner rogue</color>");
+        reply("<color=yellow>Example:</color> <color=green>.buy prisoner rogue</color> or <color=green>.buy ps rogue</color>");
 
         var sb = new StringBuilder();
-        sb.AppendLine($"<color=yellow>Blood types</color> : <color=yellow>Costs</color> (<color=#87CEFA>{CurrencyName}</color>)");
+        sb.AppendLine($"<color=yellow>Blood types</color> : <color=yellow>Costs</color> <color=#87CEFA>({CurrencyName})</color>");
 
         var all = Helper.AllowedBloodTypes
             .Select(bt =>
@@ -112,7 +116,7 @@ internal static class BuyPrisonerService
         }
         
         reply(sb.ToString().TrimEnd());
-        reply($"<color=yellow>A prisoner with <color=green>100%</color> blood quality will be placed in the nearest empty prison cell you own within {PrisonCellSearchRadius:0.0}m.</color>");
+        reply($"<color=yellow>A prisoner with <color=green>100%</color> blood quality will spawn in your nearest empty prison cell within {PrisonCellSearchRadius:0.0}m.</color>");
     }
 
     public static void BuyPrisoner(Entity senderUserEntity, Entity senderCharacterEntity, ulong steamId, string playerName, BloodType type, Action<string> reply)
@@ -126,24 +130,29 @@ internal static class BuyPrisonerService
         var em = Core.EntityManager;
         if (senderCharacterEntity == Entity.Null || !em.Exists(senderCharacterEntity))
         {
-            LogPurchase(steamId, playerName, type.ToString(), 0, false, "Character not ready");
             reply("<color=red>Character not ready.</color>");
+            return;
+        }
+
+        if (Helper.IsInCombat(senderCharacterEntity))
+        {
+            reply("<color=red>You cannot buy a prisoner while in combat.</color>");
+            return;
+        }
+
+        if (!TryFindClosestEmptyOwnedPrisonCell(senderCharacterEntity, PrisonCellSearchRadius, out var prisonCellEntity, out var prisonCellPosition, out string cellLogReason, out string cellReplyMessage))
+        {
+            LogPurchase(steamId, playerName, type.ToString(), 0, false, cellLogReason);
+            reply(cellReplyMessage);
             return;
         }
 
         int cost = GetCost(type.ToString());
 
-        if (!TryFindClosestEmptyOwnedPrisonCell(senderCharacterEntity, PrisonCellSearchRadius, out var prisonCellEntity, out var prisonCellPosition, out var reason))
+        if (!TrySpendCurrency(senderCharacterEntity, cost, out string spendLogReason, out string spendReplyMessage))
         {
-            LogPurchase(steamId, playerName, type.ToString(), 0, false, reason);
-            reply($"<color=yellow>Unsuccessful!</color> {reason}");
-            return;
-        }
-        
-        if (!TrySpendCurrency(senderCharacterEntity, cost, out reason))
-        {
-            LogPurchase(steamId, playerName, type.ToString(), 0, false, reason);
-            reply($"<color=yellow>Unsuccessful!</color> {reason}");
+            LogPurchase(steamId, playerName, type.ToString(), 0, false, spendLogReason);
+            reply(spendReplyMessage);
             return;
         }
 
@@ -158,7 +167,7 @@ internal static class BuyPrisonerService
 
                     SetupPurchasedPrisoner(senderUserEntity, e, prisonCellEntity, type);
 
-                    LogPurchase(steamId, playerName, type.ToString(), cost, true, "Successful");
+                    LogPurchase(steamId, playerName, type.ToString(), cost, true, "successful");
                     reply("<color=green>Success!</color> A prisoner was placed in your prison cell.");
 
                     var broadcastMessage =
@@ -169,7 +178,7 @@ internal static class BuyPrisonerService
                 }
                 catch (Exception ex)
                 {
-                    LogPurchase(steamId, playerName, type.ToString(), 0, false, "Spawn callback error: " + ex.Message);
+                    LogPurchase(steamId, playerName, type.ToString(), 0, false, "spawn_callback_error: " + ex.Message);
                     reply("<color=red>Prisoner spawned but setup failed.</color>");
                     Core.LogException(ex);
                 }
@@ -227,22 +236,26 @@ internal static class BuyPrisonerService
         BuffService.AddBuff(senderUserEntity, prisonerEntity, ImprisonedBuffPrefab, -1, true);
     }
 
-    private static bool TryFindClosestEmptyOwnedPrisonCell(Entity senderCharacterEntity, float radius, out Entity prisonCellEntity, out float3 prisonCellPosition, out string reason)
+    private static bool TryFindClosestEmptyOwnedPrisonCell(Entity senderCharacterEntity, float radius, out Entity prisonCellEntity, out float3 prisonCellPosition, out string cellLogReason, out string cellReplyMessage)
     {
         prisonCellEntity = Entity.Null;
         prisonCellPosition = default;
-        reason = "No empty owned prison cell found";
+
+        cellLogReason = "no_empty_owned_prison_cell_found";
+        cellReplyMessage = $"<color=yellow>Failed!</color> No empty owned prison cell found within {PrisonCellSearchRadius:0.0}m.";
 
         var em = Core.EntityManager;
         if (!em.HasComponent<LocalToWorld>(senderCharacterEntity))
         {
-            reason = "Cannot find player position";
+            cellLogReason = "cannot_find_player_position";
+            cellReplyMessage = "<color=yellow>Failed!</color> Cannot find player position.";
             return false;
         }
 
         if (!em.HasComponent<Team>(senderCharacterEntity))
         {
-            reason = "Cannot read player team";
+            cellLogReason = "cannot_read_player_team";
+            cellReplyMessage = "<color=yellow>Failed!</color> Cannot read player team.";
             return false;
         }
 
@@ -281,18 +294,28 @@ internal static class BuyPrisonerService
             cells.Dispose();
         }
 
-        return prisonCellEntity != Entity.Null;
+        bool found = prisonCellEntity != Entity.Null;
+        
+        if (found)
+        {
+            cellLogReason = string.Empty;
+            cellReplyMessage = string.Empty;
+        }
+
+        return found;
     }
 
-    private static bool TrySpendCurrency(Entity characterEntity, int amount, out string reason)
+    private static bool TrySpendCurrency(Entity characterEntity, int amount, out string spendLogReason, out string spendReplyMessage)
     {
-        reason = string.Empty;
+        spendLogReason = string.Empty;
+        spendReplyMessage = string.Empty;
 
         try
         {
             if (amount <= 0)
             {
-                reason = "Invalid cost";
+                spendLogReason = "invalid_cost";
+                spendReplyMessage = "<color=yellow>Failed!</color> Invalid cost";
                 return false;
             }
 
@@ -300,13 +323,15 @@ internal static class BuyPrisonerService
             int have = Helper.GetItemCountInInventory(characterEntity, currencyPrefab);
             if (have < amount)
             {
-                reason = $"Not enough {currencyName} ({have}/{amount})";
+                spendLogReason = $"not_enough_currency_{have}/{amount}";
+                spendReplyMessage = $"<color=yellow>Failed!</color> Not enough {currencyName} ({have}/{amount})";
                 return false;
             }
 
             if (!Helper.TryRemoveItemsFromInventory(characterEntity, currencyPrefab, amount))
             {
-                reason = "Remove items failed";
+                spendLogReason = "remove_items_failed";
+                spendReplyMessage = $"<color=red>Failed!</color> Remove items failed";
                 return false;
             }
 
@@ -314,7 +339,8 @@ internal static class BuyPrisonerService
         }
         catch (Exception e)
         {
-            reason = "Exception: " + e.Message;
+            spendLogReason = "exception: " + e.Message;
+            spendReplyMessage = "<color=red>Error!</color> An unexpected error occurred while spending currency.";
             return false;
         }
     }
@@ -331,7 +357,30 @@ internal static class BuyPrisonerService
         return config.DefaultCost;
     }
 
-    private static ConfigSection GetConfig() => ConfigService.GetPrisonerConfig();
+    private static BuySection GetConfig() => ConfigService.GetBuyPrisonerConfig();
+
+    private static void InitializeLogFile()
+    {
+        try
+        {
+            lock (LOG_LOCK)
+            {
+                Directory.CreateDirectory(CONFIG_DIR);
+
+                if (!File.Exists(LOG_FILE))
+                {
+                    using var fs = new FileStream(LOG_FILE, FileMode.Create, FileAccess.Write, FileShare.Read);
+                    using var sw = new StreamWriter(fs, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+                    
+                    sw.WriteLine("server_time,steam_id,player_name,blood_type,cost,success,reason");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Core.LogException(ex);
+        }
+    }
 
     private static void LogPurchase(ulong steamId, string playerName, string bloodType, int cost, bool success, string reason)
     {
@@ -339,19 +388,15 @@ internal static class BuyPrisonerService
         {
             lock (LOG_LOCK)
             {
-                Directory.CreateDirectory(CONFIG_DIR);
-                bool newFile = !File.Exists(LOG_FILE);
-
                 using var fs = new FileStream(LOG_FILE, FileMode.Append, FileAccess.Write, FileShare.Read);
                 using var sw = new StreamWriter(fs, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-
-                if (newFile) sw.WriteLine("server_time,steam_id,player_name,blood_type,cost,success,reason");
 
                 sw.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss},{steamId},{Csv(playerName)},{Csv(bloodType)},{cost},{(success ? "true" : "false")},{Csv(reason)}");
             }
         }
-        catch
+        catch (Exception ex)
         {
+            Core.LogException(ex);
         }
     }
 
