@@ -9,11 +9,22 @@ namespace PrisonerBlood.Services;
 internal static class ConfigService
 {
     private static readonly string CONFIG_DIR = Path.Combine(BepInEx.Paths.ConfigPath, MyPluginInfo.PLUGIN_NAME);
-    private static readonly string CONFIG_FILE = Path.Combine(CONFIG_DIR, "buyconfig.json");
+    private static readonly string BUY_CONFIG_FILE = Path.Combine(CONFIG_DIR, BUY_CONFIG_FILE_NAME);
+    private static readonly string SELL_CONFIG_FILE = Path.Combine(CONFIG_DIR, SELL_CONFIG_FILE_NAME);
+
+    public const string BUY_CONFIG_FILE_NAME = "buyconfig.json";
+    public const string SELL_CONFIG_FILE_NAME = "sellconfig.json";
+
     private static readonly object IO_LOCK = new();
 
-    private static DateTime _lastWrite = DateTime.MinValue;
-    private static ConfigRoot _root = new();
+    private static readonly BuyConfigRoot _defaultBuyRoot = CreateDefaultBuyRoot();
+    private static readonly SellConfigRoot _defaultSellRoot = CreateDefaultSellRoot();
+
+    private static DateTime _buylastWrite = DateTime.MinValue;
+    private static BuyConfigRoot _buyroot = new();
+
+    private static DateTime _sellLastWrite = DateTime.MinValue;
+    private static SellConfigRoot _sellRoot = new();
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -23,26 +34,40 @@ internal static class ConfigService
         WriteIndented = true
     };
 
-    public static string ConfigFileName => "buyconfig.json";
-
-    public static void Initialize() => Load(force: true);
-    public static void Reload() => Load(force: true);
-
-    public static ConfigSection GetPrisonerConfig()
+    public static void Initialize() 
     {
-        Load(force: false);
-        lock (IO_LOCK)
-            return CloneAndNormalize(_root.Prisoner, CreateDefaultRoot().Prisoner);
+        LoadBuy(force: true);
+        LoadSell(force: true);
+    }
+    
+    public static void Reload() 
+    {
+        LoadBuy(force: true);
+        LoadSell(force: true);
     }
 
-    public static ConfigSection GetBloodPotionConfig()
+    public static BuySection GetBuyPrisonerConfig()
     {
-        Load(force: false);
+        LoadBuy(force: false);
         lock (IO_LOCK)
-            return CloneAndNormalize(_root.BloodPotion, CreateDefaultRoot().BloodPotion);
+            return NormalizeBuy(_buyroot.Prisoner, _defaultBuyRoot.Prisoner);
     }
 
-    private static void Load(bool force)
+    public static BuySection GetBuyBloodPotionConfig()
+    {
+        LoadBuy(force: false);
+        lock (IO_LOCK)
+            return NormalizeBuy(_buyroot.BloodPotion, _defaultBuyRoot.BloodPotion);
+    }
+
+    public static SellSection GetSellPrisonerConfig()
+    {
+        LoadSell(force: false);
+        lock (IO_LOCK)
+            return NormalizeSell(_sellRoot.Prisoner, _defaultSellRoot.Prisoner);
+    }
+
+    private static void LoadBuy(bool force)
     {
         lock (IO_LOCK)
         {
@@ -50,65 +75,106 @@ internal static class ConfigService
             {
                 Directory.CreateDirectory(CONFIG_DIR);
 
-                if (!File.Exists(CONFIG_FILE))
+                if (!File.Exists(BUY_CONFIG_FILE))
                 {
-                    _root = CreateDefaultRoot();
-                    File.WriteAllText(CONFIG_FILE, JsonSerializer.Serialize(_root, JsonOptions));
-                    _lastWrite = File.GetLastWriteTime(CONFIG_FILE);
+                    _buyroot = _defaultBuyRoot;
+                    File.WriteAllText(BUY_CONFIG_FILE, JsonSerializer.Serialize(_buyroot, JsonOptions));
+                    _buylastWrite = File.GetLastWriteTime(BUY_CONFIG_FILE);
                     return;
                 }
 
-                var writeTime = File.GetLastWriteTime(CONFIG_FILE);
-                if (!force && writeTime <= _lastWrite)
+                var writeTime = File.GetLastWriteTime(BUY_CONFIG_FILE);
+                if (!force && writeTime <= _buylastWrite)
                     return;
 
-                var json = File.ReadAllText(CONFIG_FILE);
-                _root = JsonSerializer.Deserialize<ConfigRoot>(json, JsonOptions) ?? CreateDefaultRoot();
-                NormalizeRoot(_root);
-                _lastWrite = writeTime;
+                var json = File.ReadAllText(BUY_CONFIG_FILE);
+                _buyroot = JsonSerializer.Deserialize<BuyConfigRoot>(json, JsonOptions) ?? _defaultBuyRoot;
+                _buylastWrite = writeTime;
             }
             catch (Exception e)
             {
-                Core.Log.LogError($"[ConfigService] Failed to load {ConfigFileName}: {e}");
-                _root = CreateDefaultRoot();
+                Core.Log.LogError($"[ConfigService] Failed to load {BUY_CONFIG_FILE_NAME}: {e}");
+                _buyroot = _defaultBuyRoot;
             }
         }
     }
 
-    private static void NormalizeRoot(ConfigRoot root)
+    private static void LoadSell(bool force)
     {
-        var defaults = CreateDefaultRoot();
-        root.Prisoner = CloneAndNormalize(root.Prisoner, defaults.Prisoner);
-        root.BloodPotion = CloneAndNormalize(root.BloodPotion, defaults.BloodPotion);
-    }
-
-    private static ConfigSection CloneAndNormalize(ConfigSection config, ConfigSection defaults)
-    {
-        config ??= new ConfigSection();
-        defaults ??= new ConfigSection();
-
-        var bloodCosts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        foreach (var kv in config.BloodCosts ?? new Dictionary<string, int>())
+        lock (IO_LOCK)
         {
-            if (!string.IsNullOrWhiteSpace(kv.Key) && kv.Value > 0)
-                bloodCosts[kv.Key.Trim()] = kv.Value;
+            try
+            {
+                Directory.CreateDirectory(CONFIG_DIR);
+
+                if (!File.Exists(SELL_CONFIG_FILE))
+                {
+                    _sellRoot = _defaultSellRoot;
+                    File.WriteAllText(SELL_CONFIG_FILE, JsonSerializer.Serialize(_sellRoot, JsonOptions));
+                    _sellLastWrite = File.GetLastWriteTime(SELL_CONFIG_FILE);
+                    return;
+                }
+
+                var writeTime = File.GetLastWriteTime(SELL_CONFIG_FILE);
+                if (!force && writeTime <= _sellLastWrite)
+                    return;
+
+                var json = File.ReadAllText(SELL_CONFIG_FILE);
+                _sellRoot = JsonSerializer.Deserialize<SellConfigRoot>(json, JsonOptions) ?? _defaultSellRoot;                
+                _sellLastWrite = writeTime;
+            }
+            catch (Exception e)
+            {
+                Core.Log.LogError($"[ConfigService] Failed to load {SELL_CONFIG_FILE_NAME}: {e}");
+                _sellRoot = _defaultSellRoot;
+            }
         }
-
-        return new ConfigSection
+    }
+        
+    private static BuySection NormalizeBuy(BuySection config, BuySection defaults)
+    {
+        config ??= new BuySection();
+        bool hasUserCosts = config.BloodCosts != null;
+        var costs = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        if (hasUserCosts)
         {
+            foreach (var kv in config.BloodCosts)
+                if (kv.Value > 0) costs[kv.Key.Trim()] = kv.Value;
+        }
+        return new BuySection {
             Enabled = config.Enabled,
             CurrencyPrefab = config.CurrencyPrefab != 0 ? config.CurrencyPrefab : defaults.CurrencyPrefab,
             CurrencyName = string.IsNullOrWhiteSpace(config.CurrencyName) ? defaults.CurrencyName : config.CurrencyName.Trim(),
             DefaultCost = config.DefaultCost > 0 ? config.DefaultCost : defaults.DefaultCost,
-            BloodCosts = bloodCosts.Count > 0 ? bloodCosts : new Dictionary<string, int>(defaults.BloodCosts, StringComparer.OrdinalIgnoreCase)
+            BloodCosts = hasUserCosts ? costs : new Dictionary<string, int>(defaults.BloodCosts, StringComparer.OrdinalIgnoreCase)
         };
     }
 
-    private static ConfigRoot CreateDefaultRoot()
+    private static SellSection NormalizeSell(SellSection config, SellSection defaults)
     {
-        return new ConfigRoot
+        config ??= new SellSection();
+        bool hasUserPrices = config.BloodPrices != null;
+        var prices = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        if (hasUserPrices)
         {
-            Prisoner = new ConfigSection
+            foreach (var kv in config.BloodPrices)
+                if (kv.Value > 0) prices[kv.Key.Trim()] = kv.Value;
+        }
+        return new SellSection {
+            Enabled = config.Enabled,
+            MinSellableQuality = config.MinSellableQuality > 0 ? config.MinSellableQuality : defaults.MinSellableQuality,
+            CurrencyPrefab = config.CurrencyPrefab != 0 ? config.CurrencyPrefab : defaults.CurrencyPrefab,
+            CurrencyName = string.IsNullOrWhiteSpace(config.CurrencyName) ? defaults.CurrencyName : config.CurrencyName.Trim(),
+            DefaultPrice = config.DefaultPrice > 0 ? config.DefaultPrice : defaults.DefaultPrice,
+            BloodPrices = hasUserPrices ? prices : new Dictionary<string, int>(defaults.BloodPrices, StringComparer.OrdinalIgnoreCase)
+        };
+    }
+
+    private static BuyConfigRoot CreateDefaultBuyRoot()
+    {
+        return new BuyConfigRoot
+        {
+            Prisoner = new BuySection
             {
                 Enabled = true,
                 CurrencyPrefab = 576389135,
@@ -127,7 +193,7 @@ internal static class ConfigService
                     { "Scholar", 6000 }
                 }
             },
-            BloodPotion = new ConfigSection
+            BloodPotion = new BuySection
             {
                 Enabled = true,
                 CurrencyPrefab = 576389135,
@@ -144,6 +210,33 @@ internal static class ConfigService
                     { "Rogue", 600 },
                     { "Brute", 650 },
                     { "Scholar", 700 }
+                }
+            }
+        };
+    }
+
+    private static SellConfigRoot CreateDefaultSellRoot()
+    {
+        return new SellConfigRoot
+        {
+            Prisoner = new SellSection
+            {
+                Enabled = true,
+                MinSellableQuality = 80f,
+                CurrencyPrefab = 576389135,
+                CurrencyName = "Greater Stygian Shards",
+                DefaultPrice = 2500,
+                BloodPrices = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+                {
+                    { "Worker", 2000 },
+                    { "Creature", 2100 },
+                    { "Mutant", 2250 },
+                    { "Corrupted", 2400 },
+                    { "Draculin", 2500 },
+                    { "Warrior", 2600 },
+                    { "Rogue", 2750 },
+                    { "Brute", 2850 },
+                    { "Scholar", 3000 }
                 }
             }
         };
