@@ -9,18 +9,18 @@ namespace PrisonerBlood.Commands;
 [CommandGroup("buy")]
 internal static class BuyCommands
 {
-    [Command("prisoner", shortHand: "ps", adminOnly: false, description: "Buy a prisoner with 100% blood quality into a nearby empty prison cell.")]
-    public static void BuyPrisoner(ChatCommandContext ctx, string arg = "")
+    [Command("prisoner", shortHand: "ps", adminOnly: false, description: "Buy a prisoner with 100% blood quality and spawn it in a nearby empty prison cell.")]
+    public static void BuyPrisoner(ChatCommandContext ctx, string bloodTypeArg = "")
     {
-        arg = (arg ?? string.Empty).Trim();
+        bloodTypeArg = (bloodTypeArg ?? string.Empty).Trim();
 
-        if (string.IsNullOrWhiteSpace(arg) || arg.Equals("help", StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrWhiteSpace(bloodTypeArg) || bloodTypeArg.Equals("help", StringComparison.OrdinalIgnoreCase))
         {
             BuyPrisonerService.ReplyHelp(ctx.Reply);
             return;
         }
 
-        if (!BuyPrisonerService.TryParseBloodTypeStrict(arg, out BloodType bloodType))
+        if (!BuyPrisonerService.TryParseBloodTypeStrict(bloodTypeArg, out BloodType bloodType))
         {
             BuyPrisonerService.ReplyHelp(ctx.Reply, "<color=yellow>Invalid blood type.</color>");
             return;
@@ -37,37 +37,39 @@ internal static class BuyCommands
         );
     }
 
-    [Command("bloodpotion", shortHand: "bp", adminOnly: false, description: "Buy a 100% Blood Merlot potion into your inventory.")]
-    public static void BuyBloodPotion(ChatCommandContext ctx, string arg = "")
+    [Command("bloodpotion", shortHand: "bp", adminOnly: false, description: "Buy a 100% Blood Merlot potion.")]
+    public static void BuyBloodPotion(ChatCommandContext ctx, string bloodTypeArg = "", int quantity = 1)
     {
-        arg = (arg ?? string.Empty).Trim();
+        bloodTypeArg = (bloodTypeArg ?? string.Empty).Trim();
 
-        if (string.IsNullOrWhiteSpace(arg) || arg.Equals("help", StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrWhiteSpace(bloodTypeArg) || bloodTypeArg.Equals("help", StringComparison.OrdinalIgnoreCase))
         {
             BuyBloodPotionService.ReplyHelp(ctx.Reply);
             return;
         }
 
-        if (!BuyBloodPotionService.TryParseBloodTypeStrict(arg, out BloodType bloodType))
+        if (!BuyBloodPotionService.TryParseBloodTypeStrict(bloodTypeArg, out BloodType bloodType))
         {
             BuyBloodPotionService.ReplyHelp(ctx.Reply, "<color=yellow>Invalid blood type.</color>");
             return;
         }
 
         var user = ctx.Event.SenderUserEntity.Read<User>();
+        
         BuyBloodPotionService.BuyBloodPotion(
             ctx.Event.SenderCharacterEntity,
             user.PlatformId,
             user.CharacterName.ToString(),
             bloodType,
+            quantity,
             ctx.Reply
         );
     }
 
-    [Command("reload", shortHand: "rl", adminOnly: true, description: "Reload buyconfig.json.")]
+    [Command("reload", shortHand: "rl", adminOnly: true, description: "Reload buyconfig.json and sellconfig.json.")]
     public static void Reload(ChatCommandContext ctx)
     {
         ConfigService.Reload();
-        ctx.Reply("<color=green>buyconfig.json reloaded.</color>");
+        ctx.Reply($"<color=green>{ConfigService.BUY_CONFIG_FILE_NAME} and {ConfigService.SELL_CONFIG_FILE_NAME} reloaded.</color>");
     }
 }
