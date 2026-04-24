@@ -42,6 +42,7 @@ internal static class Core
         UnitSpawner = new UnitSpawnerService();
         BuyPrisonerService.Initialize();
         BuyBloodPotionService.Initialize();
+        SellPrisonerService.Initialize();
 
         _hasInitialized = true;
         Log.LogInfo($"{nameof(InitializeAfterLoaded)} completed");
