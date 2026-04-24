@@ -78,4 +78,12 @@ internal static class BuffService
 
         return true;
     }
+
+    public static void RemoveBuff(Entity Character, PrefabGUID buffPrefab)
+	{
+		if (BuffUtility.TryGetBuff(Core.EntityManager, Character, buffPrefab, out var buffEntity))
+		{
+			DestroyUtility.Destroy(Core.EntityManager, buffEntity, DestroyDebugReason.TryRemoveBuff);
+		}
+	}
 }
