@@ -68,6 +68,28 @@ internal static class Helper
         return sum;
     }
 
+    public static int GetEmptyInventorySlotsCount(Entity characterEntity)
+    {
+        var em = Core.EntityManager;
+        if (!TryGetInventoryEntity(characterEntity, out var inv))
+            return 0;
+
+        if (!em.HasComponent<InventoryBuffer>(inv))
+            return 0;
+
+        var buffer = em.GetBuffer<InventoryBuffer>(inv);
+        int emptyCount = 0;
+
+        for (int i = 0; i < buffer.Length; i++)
+        {
+            if (buffer[i].ItemType.GuidHash == 0)
+            {
+                emptyCount++;
+            }
+        }
+        return emptyCount;
+    }
+
     public static Entity AddItemToInventory(Entity recipient, PrefabGUID guid, int amount)
     {
         try
@@ -161,4 +183,24 @@ internal static class Helper
         BloodType.Mutant,
         BloodType.Corrupted
     };
+
+    private static readonly HashSet<int> CombatBuffs = new()
+    {
+        581443919,  // Buff_InCombat
+        697095869,  // Buff_InCombat_PvPVampire
+        698151145   // Buff_InCombat_Contest
+    };
+    
+    public static bool IsInCombat(Entity characterEntity)
+    {
+        var em = Core.EntityManager;
+        foreach (var buffHash in CombatBuffs)
+        {
+            if (BuffUtility.HasBuff(em, characterEntity, new PrefabGUID(buffHash)))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
 }
