@@ -19,7 +19,12 @@ internal static class BuyBloodPotionService
 
     private static readonly PrefabGUID BloodPotionPrefab = new(1223264867);
 
-    public static void Initialize() => ConfigService.Initialize();
+    public static void Initialize() 
+    {
+        ConfigService.Initialize();
+        CheckAndMigrateLogFile();
+        InitializeLogFile(); 
+    }
     public static void Reload() => ConfigService.Reload();
 
     public static string CurrencyName
@@ -69,11 +74,11 @@ internal static class BuyBloodPotionService
         if (!string.IsNullOrWhiteSpace(warningLine))
             reply(warningLine);
 
-        reply("<color=yellow>Command:</color> <color=green>.buy bp <BloodType></color>");
-        reply("<color=yellow>Example:</color> <color=green>.buy bp rogue</color>");
+        reply("<color=yellow>Command:</color> <color=green>.buy bloodpotion <BloodType> (Amount)</color>");
+        reply("<color=yellow>Example:</color> <color=green>.buy bloodpotion rogue 1</color> or <color=green>.buy bp rogue</color>");
 
         var sb = new StringBuilder();
-        sb.AppendLine($"<color=yellow>Blood types</color> : <color=yellow>Costs</color> (<color=#87CEFA>{CurrencyName}</color>)");
+        sb.AppendLine($"<color=yellow>Blood types</color> : <color=yellow>Costs</color> <color=#87CEFA>({CurrencyName})</color>");
 
         var all = Helper.AllowedBloodTypes
             .Select(bt =>
@@ -106,10 +111,10 @@ internal static class BuyBloodPotionService
         }
 
         reply(sb.ToString().TrimEnd());
-        reply("<color=yellow>You will receive 1 Blood Merlot with <color=green>100%</color> blood quality.</color>");
+        reply("<color=yellow>Blood Merlot with <color=green>100%</color> blood quality will be added to your inventory.</color>");
     }
 
-    public static void BuyBloodPotion(Entity senderCharacterEntity, ulong steamId, string playerName, BloodType type, Action<string> reply)
+    public static void BuyBloodPotion(Entity senderCharacterEntity, ulong steamId, string playerName, BloodType type, int quantity, Action<string> reply)
     {
         if (!IsEnabled())
         {
@@ -117,71 +122,92 @@ internal static class BuyBloodPotionService
             return;
         }
 
+        if (quantity < 1) quantity = 1;
+
         var em = Core.EntityManager;
         if (senderCharacterEntity == Entity.Null || !em.Exists(senderCharacterEntity))
         {
-            LogPurchase(steamId, playerName, type.ToString(), 0, false, "Character not ready");
             reply("<color=red>Character not ready.</color>");
             return;
         }
 
-        int cost = GetCost(type.ToString());
-        var (currencyPrefab, _) = GetCurrency();
+        if (Helper.IsInCombat(senderCharacterEntity))
+        {
+            reply("<color=red>You cannot buy a blood potion while in combat.</color>");
+            return;
+        }
 
-        if (!TrySpendCurrency(senderCharacterEntity, cost, out var reason))
+        int emptySlots = Helper.GetEmptyInventorySlotsCount(senderCharacterEntity);
+        if (emptySlots < quantity)
+        {
+            LogPurchase(steamId, playerName, type.ToString(), quantity, 0, false, $"not_enough_inventory_slots_{emptySlots}/{quantity}");
+            reply($"<color=yellow>Failed!</color> Not enough inventory slots ({emptySlots}/{quantity}).");
+            return;
+        }
+
+        int unitCost = GetCost(type.ToString());
+        int totalCost = unitCost * quantity;
+
+        /*
+        var (currencyPrefab, currencyName) = GetCurrency();
+
+        int totalHave = Helper.GetItemCountInInventory(senderCharacterEntity, currencyPrefab);
+        if (totalHave < totalCost)
+        {
+            LogPurchase(steamId, playerName, type.ToString(), quantity, 0, false, $"Not enough {currencyName}");
+            reply($"<color=yellow>Failed!</color> Not enough {currencyName} ({totalHave}/{totalCost}).");
+            return;
+        }
+        */
+
+        if (!TrySpendCurrency(senderCharacterEntity, totalCost, out string spendLogReason, out string spendReplyMessage))
         {       
-            LogPurchase(steamId, playerName, type.ToString(), 0, false, reason);
-            reply($"<color=yellow>Unsuccessful!</color> {reason}.");
+            LogPurchase(steamId, playerName, type.ToString(), quantity, totalCost, false, spendLogReason);
+            reply(spendReplyMessage);
             return;
         }
 
-        var potionEntity = Helper.AddItemToInventory(senderCharacterEntity, BloodPotionPrefab, 1);
-        if (potionEntity == Entity.Null || !em.Exists(potionEntity))
+        int successfulItems = 0;
+        for (int i = 0; i < quantity; i++)
         {
-            Helper.AddItemToInventory(senderCharacterEntity, currencyPrefab, cost);
-            LogPurchase(steamId, playerName, type.ToString(), 0, false, "Inventory is full");
-            reply("<color=yellow>Unsuccessful!</color> Inventory is full.");
-            return;
-        }
-
-        try
-        {
-            var blood = new StoredBlood
+            var potionEntity = Helper.AddItemToInventory(senderCharacterEntity, BloodPotionPrefab, 1);
+        
+            if (potionEntity != Entity.Null && em.Exists(potionEntity))
             {
-                BloodQuality = 100f,
-                PrimaryBloodType = new PrefabGUID((int)type)
-            };
-
-            em.SetComponentData(potionEntity, blood);
-
-            LogPurchase(steamId, playerName, type.ToString(), cost, true, "Successful");
-            reply("<color=green>Success!</color> A blood potion was added to your inventory.");
-
-            /*
-            var broadcastMessage =
-                $"<color=white>{playerName}</color> just bought a <color=green>100%</color> {type} blood potion. " +
-                "Learn more, type <color=green>.buy bloodpotion help</color>";
-
-            Helper.BroadcastSystemMessage(broadcastMessage);
-            */
+                try
+                {
+                    var blood = new StoredBlood
+                    {
+                        BloodQuality = 100f,
+                        PrimaryBloodType = new PrefabGUID((int)type)
+                    };
+                    em.SetComponentData(potionEntity, blood);
+                    successfulItems++;
+                }
+                catch (Exception ex)
+                {
+                    Core.LogException(ex);
+                }
+            }
         }
-        catch (Exception ex)
-        {
-            LogPurchase(steamId, playerName, type.ToString(), cost, false, "Set stored blood failed: " + ex.Message);
-            reply("<color=red>Blood potion was added, but setting the blood data failed.</color>");
-            Core.LogException(ex);
-        }
+
+        LogPurchase(steamId, playerName, type.ToString(), successfulItems, totalCost, true, "successful");
+
+        string pluralText = successfulItems > 1 ? "s were" : " was";
+        reply($"<color=green>Success!</color> {successfulItems} blood potion{pluralText} added to your inventory.");
     }
 
-    private static bool TrySpendCurrency(Entity characterEntity, int amount, out string reason)
+    private static bool TrySpendCurrency(Entity characterEntity, int amount, out string spendLogReason, out string spendReplyMessage)
     {
-        reason = string.Empty;
+        spendLogReason = string.Empty;
+        spendReplyMessage = string.Empty;
 
         try
         {
             if (amount <= 0)
             {
-                reason = "Invalid cost";
+                spendLogReason = "invalid_cost";
+                spendReplyMessage = "<color=yellow>Failed!</color> Invalid cost";
                 return false;
             }
 
@@ -189,13 +215,15 @@ internal static class BuyBloodPotionService
             int have = Helper.GetItemCountInInventory(characterEntity, currencyPrefab);
             if (have < amount)
             {
-                reason = $"Not enough {currencyName} ({have}/{amount})";
+                spendLogReason = $"not_enough_currency_{have}/{amount}";
+                spendReplyMessage = $"<color=yellow>Failed!</color> Not enough {currencyName} ({have}/{amount})";
                 return false;
             }
 
             if (!Helper.TryRemoveItemsFromInventory(characterEntity, currencyPrefab, amount))
             {
-                reason = "Remove items failed";
+                spendLogReason = "remove_items_failed";
+                spendReplyMessage = $"<color=red>Failed!</color> Remove items failed";
                 return false;
             }
 
@@ -203,7 +231,8 @@ internal static class BuyBloodPotionService
         }
         catch (Exception e)
         {
-            reason = "Exception: " + e.Message;
+            spendLogReason = "exception: " + e.Message;
+            spendReplyMessage = "<color=red>Error!</color> An unexpected error occurred while spending currency.";
             return false;
         }
     }
@@ -220,27 +249,80 @@ internal static class BuyBloodPotionService
         return config.DefaultCost;
     }
 
-    private static ConfigSection GetConfig() => ConfigService.GetBloodPotionConfig();
+    private static BuySection GetConfig() => ConfigService.GetBuyBloodPotionConfig();
 
-    private static void LogPurchase(ulong steamId, string playerName, string bloodType, int cost, bool success, string reason)
+    private static void CheckAndMigrateLogFile()
     {
         try
         {
             lock (LOG_LOCK)
             {
                 Directory.CreateDirectory(CONFIG_DIR);
-                bool newFile = !File.Exists(LOG_FILE);
 
+                if (File.Exists(LOG_FILE))
+                {
+                    string header = null;
+                    using (var fsRead = new FileStream(LOG_FILE, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                    using (var sr = new StreamReader(fsRead))
+                    {
+                        header = sr.ReadLine();
+                    }
+
+                    if (!string.IsNullOrEmpty(header) && !header.Contains("quantity"))
+                    {
+                        string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                        string backupFileName = Path.Combine(CONFIG_DIR, $"buybloodpotion_log_old_{timestamp}.csv");
+                        
+                        File.Move(LOG_FILE, backupFileName);
+                        
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Core.LogException(ex);
+        }
+    }
+
+    private static void InitializeLogFile()
+    {
+        try
+        {
+            lock (LOG_LOCK)
+            {
+                Directory.CreateDirectory(CONFIG_DIR);
+
+                if (!File.Exists(LOG_FILE))
+                {
+                    using var fs = new FileStream(LOG_FILE, FileMode.Create, FileAccess.Write, FileShare.Read);
+                    using var sw = new StreamWriter(fs, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+                    
+                    sw.WriteLine("server_time,steam_id,player_name,blood_type,quantity,cost,success,reason");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Core.LogException(ex);
+        }
+    }
+
+    private static void LogPurchase(ulong steamId, string playerName, string bloodType, int quantity, int cost, bool success, string reason)
+    {
+        try
+        {
+            lock (LOG_LOCK)
+            {
                 using var fs = new FileStream(LOG_FILE, FileMode.Append, FileAccess.Write, FileShare.Read);
                 using var sw = new StreamWriter(fs, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
 
-                if (newFile) sw.WriteLine("server_time,steam_id,player_name,blood_type,cost,success,reason");
-
-                sw.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss},{steamId},{Csv(playerName)},{Csv(bloodType)},{cost},{(success ? "true" : "false")},{Csv(reason)}");
+                sw.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss},{steamId},{Csv(playerName)},{Csv(bloodType)},{quantity},{cost},{(success ? "true" : "false")},{Csv(reason)}");
             }
         }
-        catch
+        catch (Exception ex)
         {
+            Core.LogException(ex);
         }
     }
 
