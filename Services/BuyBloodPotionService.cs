@@ -147,19 +147,6 @@ internal static class BuyBloodPotionService
 
         int unitCost = GetCost(type.ToString());
         int totalCost = unitCost * quantity;
-
-        /*
-        var (currencyPrefab, currencyName) = GetCurrency();
-
-        int totalHave = Helper.GetItemCountInInventory(senderCharacterEntity, currencyPrefab);
-        if (totalHave < totalCost)
-        {
-            LogPurchase(steamId, playerName, type.ToString(), quantity, 0, false, $"Not enough {currencyName}");
-            reply($"<color=yellow>Failed!</color> Not enough {currencyName} ({totalHave}/{totalCost}).");
-            return;
-        }
-        */
-
         if (!TrySpendCurrency(senderCharacterEntity, totalCost, out string spendLogReason, out string spendReplyMessage))
         {       
             LogPurchase(steamId, playerName, type.ToString(), quantity, totalCost, false, spendLogReason);
